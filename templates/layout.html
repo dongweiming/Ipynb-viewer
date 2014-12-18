@@ -1,0 +1,161 @@
+{% macro head_text(url, name, bold=False) -%}
+<li>
+    <a href="{{url}}" title="{{name}}" {%if download %}download{% endif %}>
+        {% if bold %}<strong>{% endif %}
+        <span>{{name}}</span>
+        {% if bold %}</strong>{% endif %}
+    </a>
+</li>
+{%- endmacro %}
+
+{% macro head_icon(url, name, icon, download=False) -%}
+<li>
+    <a href="{{url}}" title="{{name}}" {%if download %}download{% endif %}>
+        <span class='fa fa-{{icon}} fa-2x menu-icon'></span>
+        <span class='menu-text'>{{name}}</span>
+    </a>
+</li>
+{%- endmacro %}
+
+
+{% macro link_breadcrumbs(crumbs) -%}
+{% if crumbs %}
+<ul class="breadcrumb">
+    {% for crumb in crumbs %}
+    <li><a href="{{crumb['url']}}">{{crumb['name']}}</a> <span class="divider">/</span></li>
+    {% endfor %}
+</ul>
+{% endif %}
+{%- endmacro %}
+
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>{{title}}</title>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        {% if description %}
+        <meta name="description" content="{{ description }}">
+        {% else %}
+        <meta name="description" content="">
+        {% endif %}
+
+        {% if author %}
+        <meta name="author" content="{{ author }}">
+        {% else %}
+        <meta name="author" content="">
+        {% endif %}
+
+        <!-- Le styles -->
+        <!--<link href="/static/css/bootstrap.css" rel="stylesheet">-->
+        <link href="/static/css/docs.css" rel="stylesheet">
+        <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+        <link href="/static/css/bootstrap-responsive.css" rel="stylesheet">
+        <link href="/static/components/animate.css/animate.css" rel="stylesheet">
+        <link href="/static/components/Font-Awesome/css/font-awesome.min.css" rel="stylesheet">
+        <link href="/static/css/nbviewer.css" rel="stylesheet">
+
+
+        <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+        <!--[if lt IE 9]>
+        <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+
+        <!-- Le fav and touch icons -->
+        <link rel="shortcut icon" href="/static/ico/ipynb_icon_16x16.png">
+        <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/static/ico/apple-touch-icon-144-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" sizes="114x114" href="/static/ico/apple-touch-icon-114-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" sizes="72x72" href="/static/ico/apple-touch-icon-72-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" href="/static/ico/apple-touch-icon-57-precomposed.png">
+        {% block extra_head %}
+        {% endblock %}
+    </head>
+
+    <body data-spy="scroll" data-target=".subnav" data-offset="50">
+
+        <!-- These are loaded at the top of the body so they are available to notebook
+        cells when they are loaded below. -->
+        <script src="/static/js/jquery.min.js"></script>
+        <script src="/static/components/requirejs/require.js"></script>
+        <script src="/static/components/moment/min/moment.min.js"></script>
+
+        <!-- Navbar
+        ================================================== -->
+        <div id='menubar' class="navbar navbar-fixed-top hidden-print">
+            <div class="navbar-inner">
+                <div class="container">
+                    <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav">
+
+                            {{ head_text('/', "Ipynb-viewer", True) }}
+
+                        </ul>
+                        <ul class="nav pull-right">
+                            {% if github_url %}
+                            <li>
+                                <a href="{{github_url}}">View on GitHub</a>
+                            </li>
+                            {% endif %}
+                            {% block otherlinks %}
+                            {% endblock %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container">
+
+            {% block body %}{% endblock %}
+
+            <!-- <hr/> -->
+            <div class="row hidden-print">
+                <div class="span12 text-center">
+                    <a href="#">Back to top</a>
+                </div>
+            </div>
+
+            <!-- Footer
+            ================================================== -->
+            {% block footer %}
+            {% endblock footer %}
+
+        </div><!-- /container -->
+
+        <script src="/static/js/bootstrap-collapse.js"></script>
+        <script src="/static/components/headroom.js/dist/headroom.min.js"></script>
+        <script src="/static/components/headroom.js/dist/jQuery.headroom.min.js"></script>
+
+
+        {% block extra_script %}
+        {% endblock %}
+
+        <!-- Analytics
+        ================================================== -->
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+                (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+                                     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-38683231-2', 'auto');
+            ga('send', 'pageview');
+
+        </script>
+        <script>
+            var update_date  = function(){
+                var str = window.moment($('.date').data('date')).fromNow();
+                $('.date').text(str);
+            }
+            setInterval(update_date , 61*1000);
+            $(update_date);
+        </script>
+    </body>
+</html>
