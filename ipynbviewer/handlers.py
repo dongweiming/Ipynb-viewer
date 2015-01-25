@@ -2,6 +2,7 @@
 import io
 import os
 import time
+from urllib import quote
 from datetime import datetime
 from contextlib import contextmanager
 
@@ -11,6 +12,7 @@ from tornado.ioloop import IOLoop
 
 from IPython.nbformat.current import reads_json
 from IPython.nbconvert.exporters import Exporter
+from IPython.html.base.handlers import notebook_path_regex, path_regex
 from IPython.html import DEFAULT_STATIC_FILES_PATH as ipython_static_path
 
 component_path = os.path.join(ipython_static_path, 'components')
@@ -56,6 +58,99 @@ def render_notebook(exporter, nb, url=None, config=None):
         'css_theme': css_theme,
     }
     return html, config
+
+
+def url_path_join(*pieces):
+    initial = pieces[0].startswith('/')
+    final = pieces[-1].endswith('/')
+    stripped = [s.strip('/') for s in pieces]
+    result = '/'.join(s for s in stripped if s)
+    if initial:
+        result = '/' + result
+    if final:
+        result = result + '/'
+    if result == '//':
+        result = '/'
+    return result
+
+
+def url_escape(path):
+    """Escape special characters in a URL path
+    Turns '/foo bar/' into '/foo%20bar/'
+    """
+    parts = path.split('/')
+    return u'/'.join([quote(p) for p in parts])
+
+
+class IndexHandler(web.RequestHandler):
+    """Render the tree view, listing notebooks"""
+
+    @property
+    def base_url(self):
+        return self.settings.get('base_url', '/')
+
+    @property
+    def log(self):
+        return self.settings['log']
+
+    @property
+    def notebook_manager(self):
+        return self.settings['notebook_manager']
+
+    def render_template(self, name, **ns):
+        template = self.settings['jinja2_env'].get_template(name)
+        return template.render(**ns)
+
+    def generate_breadcrumbs(self, path):
+        breadcrumbs = [(url_escape(url_path_join(self.base_url, 'tree')), '')]
+        comps = path.split('/')
+        for i, comp in enumerate(comps):
+            if comp:
+                link = url_escape(url_path_join(
+                    self.base_url, 'tree', *comps[0:i + 1]))
+                breadcrumbs.append((link, comp))
+        return breadcrumbs
+
+    def generate_page_title(self, path):
+        comps = path.split('/')
+        if len(comps) > 3:
+            for i in range(len(comps) - 2):
+                comps.pop(0)
+        page_title = url_path_join(*comps)
+        if page_title:
+            return page_title + '/'
+        else:
+            return 'Home'
+
+    def get(self, path='', name=None):
+        path = path.strip('/')
+        nbm = self.notebook_manager
+        if name is not None:
+            # is a notebook, redirect to notebook handler
+            url = url_escape(url_path_join(
+                self.base_url, 'notebooks', path, name
+            ))
+            self.log.debug("Redirecting %s to %s", self.request.path, url)
+            self.redirect(url)
+        else:
+            if not nbm.path_exists(path=path):
+                # Directory is hidden or does not exist.
+                raise web.HTTPError(404)
+            elif nbm.is_hidden(path):
+                self.log.info(
+                    "Refusing to serve hidden directory, via 404 Error")
+                raise web.HTTPError(404)
+            breadcrumbs = self.generate_breadcrumbs(path)
+            page_title = self.generate_page_title(path)
+            print nbm.list_notebooks(path), 'sddd'
+            print nbm.list_dirs(path), 'aa'
+            notebook_list = []
+            html = self.render_template('index.html',
+                                        page_title=page_title,
+                                        breadcrumbs=breadcrumbs,
+                                        notebook_list=notebook_list,
+                                        )
+            self.write(html)
 
 
 class LocalFileHandler(web.RequestHandler):
@@ -210,6 +305,10 @@ handlers = [
      dict(path=component_path)),
     (r'/ipython-static/(.*)', web.StaticFileHandler,
      dict(path=ipython_static_path)),
-    ('/(.*)', LocalFileHandler),
+    (r"/tree%s" % notebook_path_regex, IndexHandler),
+    (r"/tree%s" % path_regex, IndexHandler),
+    ('/tree', IndexHandler),
+    (r"/notebooks%s" % notebook_path_regex, LocalFileHandler),
+    (r"/notebooks%s" % path_regex, LocalFileHandler),
     (r'.*', Custom404),
 ]

@@ -1,0 +1,15 @@
+#header {
+    display: block;
+}
+
+.site {
+    display: block;
+}
+
+#header-spacer {
+    height: 65px;
+}
+
+#tab_content {
+    padding-top: 0;
+}
