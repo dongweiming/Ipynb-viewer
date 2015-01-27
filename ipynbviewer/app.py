@@ -1,6 +1,6 @@
 # coding=utf-8
 import os
-import sys
+import argparse
 
 import markdown
 from concurrent.futures import ThreadPoolExecutor
@@ -19,27 +19,26 @@ app_log = log.app_log
 log.enable_pretty_logging()
 
 threads = 10
-default_port = 8000
-default_template_file = 'full'
 current_path = os.getcwd()
+default_template = 'full'
+
+
+def parse_arg():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--template', default=default_template)
+    parser.add_argument('-p', '--port', type=int, default=8000)
+    return parser.parse_args()
 
 
 def main():
-    l = len(sys.argv)
-    if l == 3:
-        port = int(sys.argv[1])
-        template = sys.argv[2]
-    elif l == 2:
-        port = int(sys.argv[1])
-        template = default_template_file
-    else:
-        port = default_port
-        template = default_template_file
+    args = parse_arg()
 
     config = Config()
-    config.HTMLExporter.template_file = template
+    if args.template != default_template:
+        app_log.info("Using custom template: %s", args.template)
+    config.HTMLExporter.template_file = args.template
     config.NbconvertApp.fileext = 'html'
-    config.CSSHTMLHeaderTransformer.enabled = False
+    # config.CSSHTMLHeaderTransformer.enabled = False
 
     template_path = pjoin(here, 'templates')
     static_path = pjoin(here, 'static')
@@ -70,8 +69,8 @@ def main():
 
     app = web.Application(handlers, debug=True, **settings)
     http_server = httpserver.HTTPServer(app, xheaders=True)
-    app_log.info("Listening on port %i", port)
-    http_server.listen(port)
+    app_log.info("Listening on port %i", args.port)
+    http_server.listen(args.port)
     instance = ioloop.IOLoop.instance()
     tornado.autoreload.start(instance)
     instance.start()

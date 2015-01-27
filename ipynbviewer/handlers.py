@@ -25,7 +25,7 @@ class NbFormatError(Exception):
 exporters = {}
 
 
-def render_notebook(exporter, nb, url=None, config=None):
+def render_notebook(exporter, nbfile, nb, url=None, config=None):
     if not isinstance(exporter, Exporter):
         exporter_cls = exporter
         if exporter_cls not in exporters:
@@ -51,7 +51,7 @@ def render_notebook(exporter, nb, url=None, config=None):
     if not name.endswith(".ipynb"):
         name = name + ".ipynb"
 
-    html, resources = exporter.from_notebook_node(nb)
+    html, resources = exporter.from_filename(nbfile)
 
     config = {
         'download_name': name,
@@ -125,6 +125,7 @@ class IndexHandler(web.RequestHandler):
     def get(self, path='', name=None):
         path = path.strip('/')
         nbm = self.notebook_manager
+        errors = None
         if name is not None:
             # is a notebook, redirect to notebook handler
             url = url_escape(url_path_join(
@@ -135,20 +136,22 @@ class IndexHandler(web.RequestHandler):
         else:
             if not nbm.path_exists(path=path):
                 # Directory is hidden or does not exist.
-                raise web.HTTPError(404)
+                errors = 'Directory is hidden or does not exist.'
             elif nbm.is_hidden(path):
                 self.log.info(
                     "Refusing to serve hidden directory, via 404 Error")
-                raise web.HTTPError(404)
+                errors = 'Refusing to serve hidden directory'
             breadcrumbs = self.generate_breadcrumbs(path)
             page_title = self.generate_page_title(path)
-            print nbm.list_notebooks(path), 'sddd'
-            print nbm.list_dirs(path), 'aa'
-            notebook_list = []
+            notebook_list = nbm.list_dirs(path) + nbm.list_notebooks(path)
+            if not notebook_list:
+                errors = 'Notebook list empty'
+                notebook_list = [errors]
             html = self.render_template('index.html',
                                         page_title=page_title,
                                         breadcrumbs=breadcrumbs,
                                         notebook_list=notebook_list,
+                                        errors=errors,
                                         )
             self.write(html)
 
@@ -192,7 +195,7 @@ class LocalFileHandler(web.RequestHandler):
         return self.settings.setdefault('render_timeout', 0)
 
     @gen.coroutine
-    def get(self, path):
+    def get(self, path, name=None):
         if not path:
             raise web.HTTPError(404)
         abspath = os.path.join(
@@ -202,12 +205,10 @@ class LocalFileHandler(web.RequestHandler):
         app_log.info("looking for file: '%s'" % abspath)
         if not os.path.exists(abspath):
             raise web.HTTPError(404)
-        with io.open(abspath, encoding='utf-8') as f:
-            nbdata = f.read()
-            yield self.finish_notebook(nbdata,
-                                       url=path,
-                                       msg="file from localfile: %s" % path,  # noqa
-                                       )
+        yield self.finish_notebook(abspath,
+                                   url=path,
+                                   msg="file from localfile: %s" % path,  # noqa
+        )
 
     def initialize(self):
         loop = IOLoop.current()
@@ -234,20 +235,16 @@ class LocalFileHandler(web.RequestHandler):
         self.write = self.finish = self.redirect = lambda chunk=None: None
 
     @gen.coroutine
-    def finish_notebook(self, json_notebook, url, msg=None):
+    def finish_notebook(self, nbfile, url, msg=None):
         """render a notebook from its JSON body.
 
         msg is extra information for the log message when rendering fails.
         """
-
         if msg is None:
             msg = url
-
-        try:
-            nb = reads_json(json_notebook)
-        except ValueError:
-            app_log.error("Failed to render %s", msg, exc_info=True)
-            raise web.HTTPError(400, "Error reading JSON notebook")
+        with io.open(nbfile, encoding='utf-8') as f:
+            json_notebook = f.read()
+        nb = reads_json(json_notebook)
 
         try:
             app_log.debug("Requesting render of %s", url)
@@ -256,7 +253,7 @@ class LocalFileHandler(web.RequestHandler):
                     "rendering %d B notebook from %s",
                     len(json_notebook), url)
                 nbhtml, config = yield self.pool.submit(
-                    render_notebook, self.exporter, nb, url,
+                    render_notebook, self.exporter, nbfile, nb, url,
                     config=self.config,
                 )
         except NbFormatError as e:
@@ -305,10 +302,10 @@ handlers = [
      dict(path=component_path)),
     (r'/ipython-static/(.*)', web.StaticFileHandler,
      dict(path=ipython_static_path)),
-    (r"/tree%s" % notebook_path_regex, IndexHandler),
-    (r"/tree%s" % path_regex, IndexHandler),
+    (r'/tree%s' % notebook_path_regex, IndexHandler),
+    (r'/tree%s' % path_regex, IndexHandler),
     ('/tree', IndexHandler),
-    (r"/notebooks%s" % notebook_path_regex, LocalFileHandler),
-    (r"/notebooks%s" % path_regex, LocalFileHandler),
+    (r'/notebooks/(.*)', LocalFileHandler),
+    (r'/', web.RedirectHandler, {'url': '/tree'}),
     (r'.*', Custom404),
 ]
