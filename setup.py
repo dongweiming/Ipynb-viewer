@@ -18,14 +18,9 @@ pkg_data = {
     "ipynbviewer": walk_subpkg('static') + walk_subpkg('templates')
 }
 
-install_requires = [
-    l.strip() for l in open(
-        pjoin(os.getcwd(), 'requirements.txt')).readlines()
-    ]
-
 setup_args = dict(
     name="ipynbviewer",
-    version='0.1',
+    version='0.3',
     packages=["ipynbviewer"],
     package_data=pkg_data,
     author="Dongweiming",
@@ -41,7 +36,12 @@ setup_args = dict(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
     ],
-    install_requires=install_requires,
+    install_requires=[
+        'futures',
+        'pygments',
+        'markdown',
+        'ipython',
+    ],
 )
 
 setup(**setup_args)
